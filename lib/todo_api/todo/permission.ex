@@ -3,7 +3,6 @@ defmodule TodoApi.Todo.Permission do
   import Ecto.Changeset
 
   schema "permissions" do
-
     field :user_id, :id
     field :task_id, :id
 

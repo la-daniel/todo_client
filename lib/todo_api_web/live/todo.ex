@@ -20,7 +20,14 @@ defmodule TodoApiWeb.Todo do
      |> assign_changeset_title()
      |> assign_show_create()
      |> assign_comment_changeset()
-     |> assign_show_edit_title()}
+     |> assign_show_edit_title()
+     |> assign_show_comments()}
+  end
+
+  def assign_show_comments(socket) do
+    socket
+    |> assign(:selectedCommentsId, 0)
+    |> assign(:showSelectedComments, false)
   end
 
   def assign_todo_list(socket) do
@@ -76,6 +83,25 @@ defmodule TodoApiWeb.Todo do
     {:ok, response} = Todo.get_all_lists()
     {:noreply, assign(socket, :lists, response.body["data"])}
   end
+
+  def handle_event("delete_list", params, socket) do
+    del_list = params["list-id"]
+    Logger.info(del_list)
+    # Users.delete_todo(del_todo)
+    Todo.delete_list(del_list)
+    {:ok, response} = Todo.get_all_lists()
+    {:noreply, assign(socket, :lists, response.body["data"])}
+  end
+
+  def handle_event("delete_comment", params, socket) do
+    del_comment = params["comment-id"]
+    Logger.info(del_comment)
+    # Users.delete_todo(del_todo)
+    Todo.delete_comment(del_comment)
+    {:ok, response} = Todo.get_all_lists()
+    {:noreply, assign(socket, :lists, response.body["data"])}
+  end
+
 
   def handle_event("validate_list", %{"list" => params}, socket) do
     changeset =
@@ -170,7 +196,7 @@ defmodule TodoApiWeb.Todo do
     {:noreply,
      assign(socket,
        lists: response.body["data"],
-       comment_changeset: Comment.changeset(%Comment{}, %{}),
+       comment_changeset: Comment.changeset(%Comment{}, %{})
      )}
   end
 
@@ -221,6 +247,7 @@ defmodule TodoApiWeb.Todo do
 
   def handle_event("edit_list_title_cancel", _params, socket) do
     IO.inspect("HATDOG")
+
     {:noreply,
      assign(socket,
        showEditListTitle: false,
@@ -265,6 +292,15 @@ defmodule TodoApiWeb.Todo do
 
   def handle_event("cancel_edit", _todo_params, socket) do
     {:noreply, assign(socket, %{changeset_edit: Todo.change_todo(%Task{})})}
+  end
+
+  # @selectedCommentsId and @showSelectedComments
+  def handle_event("open_comments", params, socket) do
+    {:noreply, assign(socket, selectedCommentsId: String.to_integer(params["todo"]), showSelectedComments: true)}
+  end
+  
+  def handle_event("close_comments", _params, socket) do
+    {:noreply, assign(socket, showSelectedComments: false)}
   end
 
   def handle_event(

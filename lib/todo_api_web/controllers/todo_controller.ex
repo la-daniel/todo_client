@@ -16,6 +16,7 @@ defmodule TodoApiWeb.TodoController do
     # IO.puts(Users.get_largest_order())
     latestOrder = Users.get_largest_order()
     todo_params = Map.put(todo_params, "order", latestOrder)
+
     with {:ok, %Task{} = todo} <- Users.create_todo(todo_params) do
       # IO.inspect(todo)
       conn

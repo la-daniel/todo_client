@@ -15,32 +15,31 @@ defmodule TodoApi.Todo do
     get("/tasks/")
   end
 
-  def get_task(id) do 
-    get("/tasks/"<>id)
+  def get_task(id) do
+    get("/tasks/" <> id)
   end
 
   def delete_task(id) do
     IO.inspect(id)
-    delete("/tasks/"<>id)
+    delete("/tasks/" <> id)
   end
 
-  def update_task (task) do
+  def update_task(task) do
     Logger.info("HALLO")
     IO.inspect(task)
     # mp = Multipart.new()
     # |> Multipart.add_content_type_param("charset=utf-8")
     # |> Multipart.add_field("todo", '{"detail": "Pwet", "id": "3", "title": "dsdTest Title 3"}')
     # IO.inspect(mp)
-    patch("/tasks/"<>task["id"], %{"task" => task})
+    patch("/tasks/" <> task["id"], %{"task" => task})
   end
 
-
-  def change_task_order(id, newListOrder ) do
+  def change_task_order(id, newListOrder) do
     IO.inspect(newListOrder)
-    post("/change_order", %{"id" => id, "newListOrder" => newListOrder})  
+    post("/change_order", %{"id" => id, "newListOrder" => newListOrder})
   end
-  
-  def create_task(task_params) do 
+
+  def create_task(task_params) do
     IO.inspect(task_params)
     post("/tasks/", %{"task" => task_params})
   end
@@ -69,20 +68,30 @@ defmodule TodoApi.Todo do
   def get_list(id) do
     IO.inspect("Hallo")
     IO.inspect(id)
-    get("/lists/"<>id)
+    get("/lists/" <> id)
   end
- 
-  def update_list (list) do
+
+  def update_list(list) do
     Logger.info("HALLO")
     IO.inspect(list)
     # mp = Multipart.new()
     # |> Multipart.add_content_type_param("charset=utf-8")
     # |> Multipart.add_field("todo", '{"detail": "Pwet", "id": "3", "title": "dsdTest Title 3"}')
     # IO.inspect(mp)
-    patch("/lists/"<>list["id"], %{"list" => list})
+    patch("/lists/" <> list["id"], %{"list" => list})
+  end
+
+  def delete_list(id) do
+    IO.inspect(id)
+    delete("/lists/" <> id)
+  end
+
+  def delete_comment(id) do
+    IO.inspect(id)
+    delete("/comments/" <> id)
   end
 
   def add_comment(comment) do
-    post("/comments/", %{"comment" => comment}) 
+    post("/comments/", %{"comment" => comment})
   end
 end
