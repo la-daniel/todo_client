@@ -7,7 +7,7 @@ defmodule TodoApi.Users do
   alias TodoApi.Repo
 
   require Logger
-  alias TodoApi.Users.Todo
+  alias TodoApi.Todo.Task
 
   @doc """
   Returns the list of todos.
@@ -15,7 +15,7 @@ defmodule TodoApi.Users do
   ## Examples
 
       iex> list_todos()
-      [%Todo{}, ...]
+      [%Task{}, ...]
 
   """
   def list_todos do
@@ -34,7 +34,7 @@ defmodule TodoApi.Users do
   ## Examples
 
       iex> get_todo!(123)
-      %Todo{}
+      %Task{}
 
       iex> get_todo!(456)
       ** (Ecto.NoResultsError)
@@ -48,7 +48,7 @@ defmodule TodoApi.Users do
   ## Examples
 
       iex> create_todo(%{field: value})
-      {:ok, %Todo{}}
+      {:ok, %Task{}}
 
       iex> create_todo(%{field: bad_value})
       {:error, %Ecto.Changeset{}}
@@ -66,7 +66,7 @@ defmodule TodoApi.Users do
     nextOrder = if lastOrder !== nil, do: lastOrder.order + 1, else: 1
     attrs = Map.put(attrs, "order", nextOrder)
 
-    %Todo{}
+    %Task{}
     |> Todo.changeset(attrs)
     |> Repo.insert()
   end
@@ -77,13 +77,13 @@ defmodule TodoApi.Users do
   ## Examples
 
       iex> update_todo(todo, %{field: new_value})
-      {:ok, %Todo{}}
+      {:ok, %Task{}}
 
       iex> update_todo(todo, %{field: bad_value})
       {:error, %Ecto.Changeset{}}
 
   """
-  def update_todo(%Todo{} = todo, attrs) do
+  def update_todo(%Task{} = todo, attrs) do
     todo
     |> Todo.changeset(attrs)
     |> Repo.update()
@@ -95,13 +95,13 @@ defmodule TodoApi.Users do
   ## Examples
 
       iex> delete_todo(todo)
-      {:ok, %Todo{}}
+      {:ok, %Task{}}
 
       iex> delete_todo(todo)
       {:error, %Ecto.Changeset{}}
 
   """
-  def delete_todo(%Todo{} = todo) do
+  def delete_todo(%Task{} = todo) do
     Repo.delete(todo)
   end
 
@@ -111,10 +111,10 @@ defmodule TodoApi.Users do
   ## Examples
 
       iex> change_todo(todo)
-      %Ecto.Changeset{data: %Todo{}}
+      %Ecto.Changeset{data: %Task{}}
 
   """
-  def change_todo(%Todo{} = todo, attrs \\ %{}) do
+  def change_todo(%Task{} = todo, attrs \\ %{}) do
     Todo.changeset(todo, attrs)
   end
 

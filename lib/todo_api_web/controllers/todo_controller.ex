@@ -2,7 +2,7 @@ defmodule TodoApiWeb.TodoController do
   use TodoApiWeb, :controller
 
   alias TodoApi.Users
-  alias TodoApi.Users.Todo
+  alias TodoApi.Todo.Task
 
   action_fallback TodoApiWeb.FallbackController
 
@@ -16,7 +16,7 @@ defmodule TodoApiWeb.TodoController do
     # IO.puts(Users.get_largest_order())
     latestOrder = Users.get_largest_order()
     todo_params = Map.put(todo_params, "order", latestOrder)
-    with {:ok, %Todo{} = todo} <- Users.create_todo(todo_params) do
+    with {:ok, %Task{} = todo} <- Users.create_todo(todo_params) do
       # IO.inspect(todo)
       conn
       |> put_status(:created)
@@ -33,7 +33,7 @@ defmodule TodoApiWeb.TodoController do
   def update(conn, %{"id" => id, "todo" => todo_params}) do
     todo = Users.get_todo!(id)
 
-    with {:ok, %Todo{} = todo} <- Users.update_todo(todo, todo_params) do
+    with {:ok, %Task{} = todo} <- Users.update_todo(todo, todo_params) do
       render(conn, "show.json", todo: todo)
     end
   end
@@ -41,7 +41,7 @@ defmodule TodoApiWeb.TodoController do
   def delete(conn, %{"id" => id}) do
     todo = Users.get_todo!(id)
 
-    with {:ok, %Todo{}} <- Users.delete_todo(todo) do
+    with {:ok, %Task{}} <- Users.delete_todo(todo) do
       render(conn, "show.json", todo: todo)
     end
   end
@@ -49,7 +49,7 @@ defmodule TodoApiWeb.TodoController do
   def change_order(conn, %{"id" => id, "newListOrder" => newListOrder}) do
     todo = Users.get_todo!(id)
 
-    with {:ok, %Todo{} = todo} <- Users.change_todo_order(id, newListOrder) do
+    with {:ok, %Task{} = todo} <- Users.change_todo_order(id, newListOrder) do
       render(conn, "show.json", todo: todo)
     end
   end

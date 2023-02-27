@@ -53,6 +53,7 @@ defmodule TodoApi.MixProject do
       {:ex_fontawesome, "~> 0.7.2"},
       {:tesla, "~> 1.4"},
       {:hackney, "~> 1.17"},
+      {:credo, "~> 1.6", only: [:dev, :test], runtime: false}
     ]
   end
 
