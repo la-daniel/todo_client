@@ -7,11 +7,12 @@ defmodule TodoApiWeb.Todo do
   alias TodoApi.Todo.Task
   alias TodoApi.Todo.List
   alias TodoApi.Todo.Comment
-  alias TodoApi.Todo
+  alias TodoApiWeb.TodoCont
 
-  def mount(_params, _session, socket) do
+  def mount(_params, session, socket) do
     {:ok,
      socket
+     |> assign_token(session)
      |> assign_todo()
      |> assign_todo_list()
      |> assign_todo_changeset()
@@ -21,7 +22,32 @@ defmodule TodoApiWeb.Todo do
      |> assign_show_create()
      |> assign_comment_changeset()
      |> assign_show_edit_title()
-     |> assign_show_comments()}
+     |> assign_show_comments()
+     # TODO make this current_user with all user attrs available later?
+     |> assign_email(session)
+     # getting session ID from
+     |> assign_user_id(session)}
+  end
+
+  def assign_user_id(socket, session) do
+    user = session["current_user"]
+
+    socket
+    |> assign(:current_user_id, user["id"])
+  end
+
+  def assign_token(socket, session) do
+    token = session["token"]
+
+    socket
+    |> assign(:token, token)
+  end
+
+  def assign_email(socket, session) do
+    user = session["current_user"]
+
+    socket
+    |> assign(:email, user["email"])
   end
 
   def assign_show_comments(socket) do
@@ -31,7 +57,10 @@ defmodule TodoApiWeb.Todo do
   end
 
   def assign_todo_list(socket) do
-    {:ok, response} = Todo.get_all_lists()
+    client = TodoCont.client(socket)
+    {:ok, response} = TodoCont.get_all_lists(client)
+    # {:ok, response} = TodoCont.get_all_lists()
+    IO.inspect(response.body)
 
     socket
     |> assign(:lists, response.body["data"])
@@ -60,7 +89,7 @@ defmodule TodoApiWeb.Todo do
   end
 
   def assign_todo_changeset(socket) do
-    assign(socket, %{task_changeset: Todo.change_todo(%Task{})})
+    assign(socket, %{task_changeset: TodoCont.change_todo(%Task{})})
   end
 
   def assign_list_changeset(socket) do
@@ -68,7 +97,7 @@ defmodule TodoApiWeb.Todo do
   end
 
   def assign_changeset_edit(socket) do
-    assign(socket, %{changeset_edit: Todo.change_todo(%Task{})})
+    assign(socket, %{changeset_edit: TodoCont.change_todo(%Task{})})
   end
 
   def assign_comment_changeset(socket) do
@@ -77,31 +106,85 @@ defmodule TodoApiWeb.Todo do
 
   def handle_event("delete", params, socket) do
     del_todo = params["todo"]
-    Logger.info(del_todo)
+    IO.inspect(del_todo)
     # Users.delete_todo(del_todo)
-    Todo.delete_task(del_todo)
-    {:ok, response} = Todo.get_all_lists()
-    {:noreply, assign(socket, :lists, response.body["data"])}
+    client = TodoCont.client(socket)
+    {:ok, response} = TodoCont.delete_task(client, del_todo)
+
+    with %{"data" => deleted_data} = %{"data" => %{}} <- response.body do
+      client = TodoCont.client(socket)
+      {:ok, response} = TodoCont.get_all_lists(client)
+      IO.inspect(deleted_data)
+      deleted_task_name = deleted_data["title"]
+
+      {:noreply,
+       socket
+       |> push_event("toast", %{message: "Deleted task " <> deleted_task_name <> " successfully"})
+       |> assign(lists: response.body["data"])}
+    else
+      %{"error" => %{"code" => 401, "message" => "Not authenticated"}} ->
+        {:noreply,
+         socket
+         |> push_event("toast", %{message: "Session Expired: You need to relogin!"})
+         |> push_redirect(to: "/logout")}
+    end
   end
 
   def handle_event("delete_list", params, socket) do
     del_list = params["list-id"]
-    Logger.info(del_list)
+    IO.inspect(del_list)
     # Users.delete_todo(del_todo)
-    Todo.delete_list(del_list)
-    {:ok, response} = Todo.get_all_lists()
-    {:noreply, assign(socket, :lists, response.body["data"])}
+    client = TodoCont.client(socket)
+    {:ok, response} = TodoCont.delete_list(client, del_list)
+
+    with %{"data" => deleted_data} = %{"data" => %{}} <- response.body do
+      IO.inspect(deleted_data)
+      client = TodoCont.client(socket)
+      {:ok, response} = TodoCont.get_all_lists(client)
+      IO.inspect(deleted_data)
+      deleted_list_name = deleted_data["title"]
+
+      {:noreply,
+       socket
+       |> push_event("toast", %{message: "Deleted list " <> deleted_list_name <> " successfully"})
+       |> assign(lists: response.body["data"])}
+    else
+
+      %{"error" => %{"code" => 401, "message" => "Not authenticated"}} ->
+        {:noreply,
+         socket
+         |> push_event("toast", %{message: "Session Expired: You need to relogin!"})
+         |> push_redirect(to: "/logout")}
+    end
   end
 
   def handle_event("delete_comment", params, socket) do
     del_comment = params["comment-id"]
     Logger.info(del_comment)
     # Users.delete_todo(del_todo)
-    Todo.delete_comment(del_comment)
-    {:ok, response} = Todo.get_all_lists()
-    {:noreply, assign(socket, :lists, response.body["data"])}
-  end
+    client = TodoCont.client(socket)
+    {:ok, response} = TodoCont.delete_comment(client, del_comment)
 
+    with %{"data" => deleted_data} = %{"data" => %{}} <- response.body do
+      client = TodoCont.client(socket)
+      {:ok, response} = TodoCont.get_all_lists(client)
+      IO.inspect(deleted_data)
+      deleted_comment_name = deleted_data["comment"]
+
+      {:noreply,
+       socket
+       |> push_event("toast", %{
+         message: "Deleted comment " <> deleted_comment_name <> " successfully"
+       })
+       |> assign(lists: response.body["data"])}
+    else
+      %{"error" => %{"code" => 401, "message" => "Not authenticated"}} ->
+        {:noreply,
+         socket
+         |> push_event("toast", %{message: "Session Expired: You need to relogin!"})
+         |> push_redirect(to: "/logout")}
+    end
+  end
 
   def handle_event("validate_list", %{"list" => params}, socket) do
     changeset =
@@ -133,7 +216,7 @@ defmodule TodoApiWeb.Todo do
   def handle_event("validate_edit", %{"todo" => params}, socket) do
     changeset =
       %Task{}
-      |> Todo.change_todo(params)
+      |> TodoCont.change_todo(params)
       |> Map.put(:action, :insert)
 
     {:noreply, assign(socket, changeset_edit: changeset)}
@@ -149,55 +232,140 @@ defmodule TodoApiWeb.Todo do
   end
 
   def handle_event("edit", %{"task" => todo_params}, socket) do
-    # {:ok, response} = Todo.get_todo(todo_params["id"])
+    # {:ok, response} = TodoCont.get_todo(todo_params["id"])
     # update_todo = response.body
     # IO.inspect(update_todo)
-    Todo.update_task(todo_params)
-    # Ecto.Changeset.change(socket.assigns.changeset_edit, id: 0)
-    # assign(socket, %{changeset_edit: Todo.change_todo(%Task{})})
-    # Logger.info(socket.assigns.changeset_edit)
-    {:ok, response} = Todo.list_tasks()
+    client = TodoCont.client(socket)
+    {:ok, response} = TodoCont.update_task(client, todo_params)
 
-    {:noreply,
-     assign(socket, lists: response.body["data"], changeset_edit: Todo.change_todo(%Task{}))}
+    with %{"data" => edited_data} = %{"data" => %{}} <- response.body do
+      client = TodoCont.client(socket)
+      {:ok, response} = TodoCont.get_all_lists(client)
+      IO.inspect(edited_data)
+      edited_task_title = edited_data["title"]
+      IO.inspect(TodoApi.Todo.Task.changeset(%Task{}, %{}))
+      {:noreply,
+       socket
+       |> push_event("toast", %{message: "Edited task " <> edited_task_title <> " successfully"})
+       |> assign(
+         lists: response.body["data"],
+         changeset_edit: TodoApi.Todo.Task.changeset(%Task{}, %{})
+       )}
+    else
+      %{"errors" => error} = %{"errors" => %{}} ->
+        IO.inspect(error)
+        header = ["Errors: \n "]
+
+        title_errors =
+          if Map.has_key?(error, "title"), do: "title: " <> "#{error["title"]}", else: ""
+
+        IO.inspect(title_errors)
+        error_list = Enum.join([header, title_errors], " ")
+        IO.inspect(error_list)
+        {:noreply, push_event(socket, "toast", %{message: error_list})}
+
+      %{"error" => %{"code" => 401, "message" => "Not authenticated"}} ->
+        {:noreply,
+         socket
+         |> push_event("toast", %{message: "Session Expired: You need to relogin!"})
+         |> push_redirect(to: "/logout")}
+    end
+
+    # Ecto.Changeset.change(socket.assigns.changeset_edit, id: 0)
+    # assign(socket, %{changeset_edit: TodoCont.change_todo(%Task{})})
+    # Logger.info(socket.assigns.changeset_edit)
   end
 
   def handle_event("move", todo_params, socket) do
     Logger.debug(todo_params)
 
-    Todo.change_task_order(
+    client = TodoCont.client(socket)
+
+    TodoCont.change_task_order(
+      client,
       String.to_integer(todo_params["todo-id"], 10),
       String.to_integer(todo_params["move-to"], 10)
     )
 
-    {:ok, response} = Todo.list_tasks()
+    {:ok, response} = TodoCont.list_tasks(client)
 
     {:noreply, assign(socket, :lists, response.body["data"])}
   end
 
   def handle_event("save_list", %{"list" => list_params}, socket) do
-    Todo.create_list(list_params)
-    # IO.inspect(list_params)
-    {:ok, response} = Todo.get_all_lists()
+    client = TodoCont.client(socket)
+    list_params = Map.put(list_params, "user_id", socket.assigns.current_user_id)
+    {:ok, response} = TodoCont.create_list(client, list_params)
 
-    {:noreply,
-     assign(socket,
-       lists: response.body["data"],
-       list_changeset: List.changeset(%List{}, %{}),
-       showCreateList: false
-     )}
+    with %{"data" => created_data} = %{"data" => %{}} <- response.body do
+      client = TodoCont.client(socket)
+      {:ok, response} = TodoCont.get_all_lists(client)
+      IO.inspect(created_data)
+      created_list_name = created_data["title"]
+
+      {:noreply,
+       socket
+       |> push_event("toast", %{message: "Created list " <> created_list_name <> " successfully"})
+       |> assign(
+         lists: response.body["data"],
+         list_changeset: List.changeset(%List{}, %{}),
+         showCreateList: false
+       )}
+    else
+      %{"errors" => error} = %{"errors" => %{}} ->
+        IO.inspect(error)
+        header = ["Errors: \n "]
+
+        title_errors =
+          if Map.has_key?(error, "title"), do: "title: " <> "#{error["title"]}", else: ""
+
+        IO.inspect(title_errors)
+        error_list = Enum.join([header, title_errors], " ")
+        IO.inspect(error_list)
+        {:noreply, push_event(socket, "toast", %{message: error_list})}
+
+      %{"error" => %{"code" => 401, "message" => "Not authenticated"}} ->
+        {:noreply,
+         socket
+         |> push_event("toast", %{message: "Session Expired: You need to relogin!"})
+         |> push_redirect(to: "/logout")}
+    end
   end
 
   def handle_event("save_comment", %{"comment" => comment_params}, socket) do
-    Todo.add_comment(comment_params)
-    IO.inspect(comment_params)
-    {:ok, response} = Todo.get_all_lists()
-
-    {:noreply,
-     assign(socket,
+    client = TodoCont.client(socket)
+    {:ok, response} = TodoCont.add_comment(client, comment_params)
+    with %{"data" => created_data} = %{"data" => %{}} <- response.body do
+      client = TodoCont.client(socket)
+      {:ok, response} = TodoCont.get_all_lists(client)
+      IO.inspect(created_data)
+      created_comment_name = created_data["comment"]
+      {:noreply,
+       socket
+       |> push_event("toast", %{message: "Created comment " <> created_comment_name <> " successfully"})
+       |> assign(
        lists: response.body["data"],
-       comment_changeset: Comment.changeset(%Comment{}, %{})
-     )}
+       comment_changeset: Comment.changeset(%Comment{}, %{}))
+      }
+    else
+      %{"errors" => error} = %{"errors" => %{}} ->
+        IO.inspect(error)
+        header = ["Errors: \n "]
+
+        comment_errors =
+          if Map.has_key?(error, "comment"), do: "comment: " <> "#{error["comment"]}", else: ""
+
+        IO.inspect(comment_errors)
+        error_list = Enum.join([header, comment_errors], " ")
+        IO.inspect(error_list)
+        {:noreply, push_event(socket, "toast", %{message: error_list})}
+
+      %{"error" => %{"code" => 401, "message" => "Not authenticated"}} ->
+        {:noreply,
+         socket
+         |> push_event("toast", %{message: "Session Expired: You need to relogin!"})
+         |> push_redirect(to: "/logout")}
+    end
   end
 
   def handle_event("save_task", %{"task" => task_params}, socket) do
@@ -207,16 +375,47 @@ defmodule TodoApiWeb.Todo do
     task_params =
       Map.put(task_params, "list_id", Integer.to_string(socket.assigns.selectedCreateListId))
 
-    Todo.create_task(task_params)
-    # IO.inspect(task_params)
-    {:ok, response} = Todo.get_all_lists()
+    client = TodoCont.client(socket)
+    {:ok, response} = TodoCont.create_task(client, task_params)
 
-    {:noreply,
-     assign(socket,
-       lists: response.body["data"],
-       task_changeset: Todo.change_todo(%Task{}),
-       showCreateTask: false
-     )}
+    with %{"data" => created_data} = %{"data" => %{}} <- response.body do
+      client = TodoCont.client(socket)
+      {:ok, response} = TodoCont.get_all_lists(client)
+      IO.inspect(created_data)
+      created_task_name = created_data["title"]
+      IO.inspect(created_task_name)
+
+      {:noreply,
+       socket
+       |> push_event("toast", %{message: "Created task " <> created_task_name <> " successfully"})
+       |> assign(
+         lists: response.body["data"],
+         task_changeset: TodoCont.change_todo(%Task{}),
+         showCreateTask: false
+       )}
+    else
+      %{"errors" => error} = %{"errors" => %{}} ->
+        IO.inspect(error)
+        header = ["Errors: \n "]
+
+        title_errors =
+          if Map.has_key?(error, "title"), do: "title: " <> "#{error["title"]}\n", else: ""
+
+        detail_errors =
+          if Map.has_key?(error, "detail"), do: "detail: " <> "#{error["detail"]}\n", else: ""
+
+        IO.inspect(title_errors)
+        IO.inspect(detail_errors)
+        error_list = Enum.join([header, title_errors, detail_errors], " ")
+        IO.inspect(error_list)
+        {:noreply, push_event(socket, "toast", %{message: error_list})}
+
+      %{"error" => %{"code" => 401, "message" => "Not authenticated"}} ->
+        {:noreply,
+         socket
+         |> push_event("toast", %{message: "Session Expired: You need to relogin!"})
+         |> push_redirect(to: "/logout")}
+    end
   end
 
   def handle_event("toggle_create_list", _params, socket) do
@@ -234,7 +433,8 @@ defmodule TodoApiWeb.Todo do
 
   def handle_event("edit_list_title", params, socket) do
     list_id = params["list-id"]
-    {:ok, response} = Todo.get_list(list_id)
+    client = TodoCont.client(socket)
+    {:ok, response} = TodoCont.get_list(client, list_id)
     list_body = response.body["data"]
 
     {:noreply,
@@ -256,31 +456,63 @@ defmodule TodoApiWeb.Todo do
   end
 
   def handle_event("start_edit", todo_params, socket) do
-    Logger.info(todo_params["todo"])
-    {:ok, response} = Todo.get_task(todo_params["todo"])
+    client = TodoCont.client(socket)
+    {:ok, response} = TodoCont.get_task(client, todo_params["todo"])
     todo_body = response.body["data"]
-    # IO.inspect(response)
+    IO.inspect("THEBODY")
+    IO.inspect(todo_body)
 
     {:ok, todo} =
       %Task{}
       |> Task.changeset(todo_body)
       |> Ecto.Changeset.apply_action(:update)
 
-    # IO.inspect(todo)
+    IO.inspect(todo)
     # Logger.info(todo)
-    # IO.inspect(Todo.change_todo(todo).data)
-    {:noreply, assign(socket, changeset_edit: Todo.change_todo(todo))}
+    IO.inspect("AHAH")
+    IO.inspect(TodoCont.change_todo(todo).data)
+    {:noreply, assign(socket, changeset_edit: TodoCont.change_todo(todo))}
   end
 
   def handle_event("edit_title", %{"list" => title_params}, socket) do
     list_id = title_params["id"]
-    {:ok, response} = Todo.get_list(list_id)
+    client = TodoCont.client(socket)
+    {:ok, response} = TodoCont.get_list(client, list_id)
     list_body = response.body["data"]
     IO.inspect(list_body)
     updatedList = Map.merge(list_body, title_params)
-    Todo.update_list(updatedList)
+    {:ok, response} = TodoCont.update_list(client, updatedList)
+    with %{"data" => edited_data} = %{"data" => %{}} <- response.body do
+      client = TodoCont.client(socket)
+      {:ok, response} = TodoCont.get_all_lists(client)
+      IO.inspect(edited_data)
+      edited_list_title = edited_data["title"]
+      {:noreply,
+       socket
+       |> push_event("toast", %{message: "Edited list " <> edited_list_title <> " successfully"})
+       |> assign(socket,
+         lists: response.body["data"],
+         changeset_edit: TodoCont.change_todo(%Task{})
+       )}
+    else
+      %{"errors" => error} = %{"errors" => %{}} ->
+        IO.inspect(error)
+        header = ["Errors: \n "]
 
-    {:ok, response} = Todo.get_all_lists()
+        title_errors =
+          if Map.has_key?(error, "title"), do: "title: " <> "#{error["title"]}", else: ""
+
+        IO.inspect(title_errors)
+        error_list = Enum.join([header, title_errors], " ")
+        IO.inspect(error_list)
+        {:noreply, push_event(socket, "toast", %{message: error_list})}
+
+      %{"error" => %{"code" => 401, "message" => "Not authenticated"}} ->
+        {:noreply,
+         socket
+         |> push_event("toast", %{message: "Session Expired: You need to relogin!"})
+         |> push_redirect(to: "/logout")}
+    end
 
     {:noreply,
      assign(socket,
@@ -291,16 +523,25 @@ defmodule TodoApiWeb.Todo do
   end
 
   def handle_event("cancel_edit", _todo_params, socket) do
-    {:noreply, assign(socket, %{changeset_edit: Todo.change_todo(%Task{})})}
+    {:noreply, assign(socket, %{changeset_edit: TodoCont.change_todo(%Task{})})}
   end
 
   # @selectedCommentsId and @showSelectedComments
   def handle_event("open_comments", params, socket) do
-    {:noreply, assign(socket, selectedCommentsId: String.to_integer(params["todo"]), showSelectedComments: true)}
+    {:noreply,
+     assign(socket,
+       selectedCommentsId: String.to_integer(params["todo"]),
+       showSelectedComments: true
+     )}
   end
-  
+
   def handle_event("close_comments", _params, socket) do
-    {:noreply, assign(socket, showSelectedComments: false)}
+    {
+      :noreply,
+      socket
+      |> assign(showSelectedComments: false)
+      # |> push_event("toast", %{message: "closed comments"})
+    }
   end
 
   def handle_event(
@@ -318,5 +559,10 @@ defmodule TodoApiWeb.Todo do
 
     Logger.warn(draggable_index)
     {:noreply, socket}
+  end
+
+  def handle_event("toast_test", _params, socket) do
+    {:noreply,
+     push_event(socket, "toast", %{message: "Your record has been created successfully"})}
   end
 end

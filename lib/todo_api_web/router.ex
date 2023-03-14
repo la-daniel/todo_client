@@ -1,5 +1,6 @@
 defmodule TodoApiWeb.Router do
   use TodoApiWeb, :router
+  alias TodoApiWeb.Plug.EnsureAuthenticated
 
   pipeline :browser do
     plug :accepts, ["html"]
@@ -14,12 +15,25 @@ defmodule TodoApiWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :authenticated do
+    plug EnsureAuthenticated
+  end
+
   scope "/", TodoApiWeb do
     pipe_through :browser
-    live "/", Todo
+    live "/login", Login
+    live "/registration", Register
+    post "/sessions", SessionController, :login
+    post "/register", SessionController, :register
+    get "/logout", SessionController, :logout
     # resources "/todos", TodoController, except: [:new, :edit]
     # post "/change_order", TodoController, :change_order
     # get "/", PageController, :index
+  end
+
+  scope "/", TodoApiWeb do
+    pipe_through [:browser, :authenticated] 
+    live "/", Todo
   end
 
   # Other scopes may use custom stacks.

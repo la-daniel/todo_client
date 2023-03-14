@@ -7,15 +7,14 @@ defmodule TodoApi.Todo.List do
     field :title, :string
     field :user_id, :id
     field :assigned_to, :id
-
     timestamps()
   end
 
   @doc false
   def changeset(list, attrs) do
     list
-    |> cast(attrs, [:order, :title])
-    |> validate_required([:order, :title])
+    |> cast(attrs, [ :title])
+    |> validate_required([:title])
   end
 
   def title_changeset(list, attrs) do
